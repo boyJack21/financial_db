@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Financial Data Visualization</title>
+    <!-- Chart.js library for creating graphs -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        h1, h2 {
+            color: #333;
+        }
+
+       
+        .upload-form {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+       
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        
+        input[type="number"], input[type="file"] {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+
+        
+        .error {
+            color: red;
+            margin-top: 10px;
+        }
+        .success {
+            color: green;
+            margin-top: 10px;
+        }
+
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+
+       
+        .chart-container {
+            position: relative;
+            height: 400px;
+            margin-bottom: 20px;
+        }
+
+        
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Financial Data Visualization</h1>
+        
+        <!-- Upload form for selecting Excel file -->
+        <div class="upload-form">
+            <h2>Upload Excel File</h2>
+
+            <!-- User ID input -->
+            <div class="form-group">
+                <label for="userid">User ID:</label>
+                <input type="number" id="userid" value="1">
+            </div>
+
+            <!-- Year input -->
+            <div class="form-group">
+                <label for="year">Year:</label>
+                <input type="number" id="year" value="2023">
+            </div>
+
+            <!-- Excel file input -->
+            <div class="form-group">
+                <label for="file">Excel File (.xlsx):</label>
+                <input type="file" id="file" accept=".xlsx">
+            </div>
+
+            <!-- Upload button -->
+            <button onclick="uploadFile()">Upload</button>
+
+            <!-- Message area (success/error) -->
+            <div id="upload-message" class="hidden"></div>
+        </div>
+        
+        <!-- Section for showing results after upload -->
+        <div id="data-display" class="hidden">
+            <h2>Financial Data for <span id="user-name"></span> (<span id="data-year"></span>)</h2>
+            
+            <!-- Table of month/amount -->
+            <h3>Monthly Data</h3>
+            <table id="data-table">
+                <thead>
+                    <tr>
+                        <th>Month</th>
+                        <th>Amount</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+            
+            <!-- Chart.js bar chart -->
+            <h3>Visualization</h3>
+            <div class="chart-container">
+                <canvas id="financial-chart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Variable to hold chart instance (so we can destroy/rebuild)
+        let financialChart = null;
+        
+        // Function triggered when Upload button is clicked
+        function uploadFile() {
+            const fileInput = document.getElementById('file');
+            const userId = document.getElementById('userid').value;
+            const year = document.getElementById('year').value;
+            const messageDiv = document.getElementById('upload-message');
+            
+            // Ensure file is selected
+            if (!fileInput.files.length) {
+                showMessage(messageDiv, 'Please select a file', 'error');
+                return;
+            }
+            
+            // Prepare multipart/form-data request
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+            
+            // Inform user upload is starting
+            showMessage(messageDiv, 'Uploading...', '');
+            
+            // Send request to backend API
+            fetch(`http://localhost:3001/api/finances/upload/${userId}/${year}`, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                // If error returned from backend
+                if (data.error) {
+                    showMessage(messageDiv, data.error, 'error');
+                } else {
+                    // Show success and auto-fetch data for visualization
+                    showMessage(messageDiv, data.message, 'success');
+                    fetchData(userId, year);
+                }
+            })
+            .catch(error => {
+                showMessage(messageDiv, 'Upload failed: ' + error.message, 'error');
+            });
+        }
+        
+        //Fetch data from backend for a given user/year
+        function fetchData(userId, year) {
+            fetch(`http://localhost:3001/api/finances/${userId}/${year}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert('Error: ' + data.error);
+                } else {
+                    // If data found, display in table and chart
+                    displayData(data);
+                }
+            })
+            .catch(error => {
+                alert('Failed to fetch data: ' + error.message);
+            });
+        }
+        
+        // Render table and chart using fetched data
+        function displayData(data) {
+            // Update page header with user name & year
+            document.getElementById('user-name').textContent = data.name;
+            document.getElementById('data-year').textContent = data.year;
+            
+            // Fill table with rows
+            const tableBody = document.querySelector('#data-table tbody');
+            tableBody.innerHTML = ''; // clear old rows
+            
+            data.records.forEach(record => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${record.month}</td>
+                    <td>${record.amount}</td>
+                `;
+                tableBody.appendChild(row);
+            });
+            
+            // Prepare chart data
+            const months = data.records.map(record => record.month);
+            const amounts = data.records.map(record => record.amount);
+            
+            const ctx = document.getElementById('financial-chart').getContext('2d');
+            
+            // Destroy existing chart (to avoid overlaying)
+            if (financialChart) {
+                financialChart.destroy();
+            }
+            
+            // Create bar chart
+            financialChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: months,
+                    datasets: [{
+                        label: 'Amount',
+                        data: amounts,
+                        backgroundColor: 'rgba(54, 162, 235, 0.5)',
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Amount'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Month'
+                            }
+                        }
+                    }
+                }
+            });
+            
+            // Make hidden data-display section visible
+            document.getElementById('data-display').classList.remove('hidden');
+        }
+        
+        // Show feedback messages (error/success)
+        function showMessage(element, message, type) {
+            element.textContent = message;
+            element.classList.remove('hidden', 'error', 'success');
+            
+            if (type === 'error') {
+                element.classList.add('error');
+            } else if (type === 'success') {
+                element.classList.add('success');
+            }
+        }
+    </script>
+</body>
+</html>
