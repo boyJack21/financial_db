@@ -21,7 +21,7 @@ const upload = multer({
   fileFilter: (req, file, cb) => {
     const allowedMimes = new Set([
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
-      'application/vnd.ms-excel' // legacy .xls (many systems still use this)
+      'application/vnd.ms-excel' // legacy .xls 
     ]);
     const ext = path.extname(file.originalname).toLowerCase();
     if (allowedMimes.has(file.mimetype) || ['.xlsx', '.xls', '.xlsm'].includes(ext)) {
