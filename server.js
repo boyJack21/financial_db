@@ -129,7 +129,7 @@ const findHeaderIndexes = (rows) => {
   return null;
 };
 
-// Utility to ensure uploaded file is removed (best-effort)
+// Utility to ensure uploaded file is removed
 const cleanupFile = (filePath) => {
   try {
     if (filePath && fs.existsSync(filePath)) fs.unlinkSync(filePath);
